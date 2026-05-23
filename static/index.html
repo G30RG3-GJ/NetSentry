@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetSentry | MikroTik Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h2>NetSentry</h2>
+            </div>
+            <nav>
+                <ul id="nav-tabs">
+                    <li class="active" data-tab="dashboard-tab"><i class="fa-solid fa-chart-line"></i> Dashboard</li>
+                    <li data-tab="netmap-tab"><i class="fa-solid fa-diagram-project"></i> Network Map</li>
+                    <li data-tab="dhcp-tab"><i class="fa-solid fa-laptop-network"></i> DHCP Leases</li>
+                    <li data-tab="arp-tab"><i class="fa-solid fa-address-book"></i> ARP Table</li>
+                    <li data-tab="ip-addresses-tab"><i class="fa-solid fa-network-wired"></i> IP Addresses</li>
+                    <li data-tab="connections-tab"><i class="fa-solid fa-right-left"></i> Connections</li>
+                    <li data-tab="sniffer-tab"><i class="fa-solid fa-satellite-dish"></i> Live Traffic</li>
+                    <li data-tab="nat-tab"><i class="fa-solid fa-door-open"></i> NAT Rules</li>
+                    <li data-tab="mangle-tab"><i class="fa-solid fa-code-branch"></i> Mangle Rules</li>
+                    <li data-tab="firewall-tab"><i class="fa-solid fa-shield-cat"></i> Firewall Filters</li>
+                    <li data-tab="address-lists-tab"><i class="fa-solid fa-list"></i> Address Lists</li>
+                    <li data-tab="routes-tab"><i class="fa-solid fa-route"></i> IP Routes</li>
+                    <li data-tab="neighbors-tab"><i class="fa-solid fa-tower-broadcast"></i> Neighbors</li>
+                    <li data-tab="dns-tab"><i class="fa-solid fa-globe"></i> DNS Tracker</li>
+                    <li data-tab="queues-tab"><i class="fa-solid fa-gauge-high"></i> Bandwidth Queues</li>
+                    <li data-tab="wireless-tab"><i class="fa-solid fa-wifi"></i> Wireless Clients</li>
+                    <li data-tab="hotspot-tab"><i class="fa-solid fa-signal"></i> Hotspot Users</li>
+                    <li data-tab="vpn-tab"><i class="fa-solid fa-user-shield"></i> VPN Clients</li>
+                    <li data-tab="services-tab"><i class="fa-solid fa-server"></i> IP Services</li>
+                    <li data-tab="scripts-tab"><i class="fa-solid fa-scroll"></i> Scripts & Scheduler</li>
+                    <li data-tab="packages-tab"><i class="fa-solid fa-box-open"></i> Packages</li>
+                    <li data-tab="users-tab"><i class="fa-solid fa-users"></i> System Users</li>
+                    <li data-tab="alerts-tab"><i class="fa-solid fa-triangle-exclamation"></i> Alerts & Logs</li>
+                    <li data-tab="scanner-tab"><i class="fa-solid fa-radar"></i> Port Scanner</li>
+                    <li data-tab="tools-tab"><i class="fa-solid fa-toolbox"></i> Diagnostics</li>
+                </ul>
+            </nav>
+            <div class="status-indicator mt-auto">
+                <div class="pulse-ring"></div>
+                <span id="connection-status">Connecting...</span>
+            </div>
+            <div class="health-widget mt-2">
+                <p><i class="fa-solid fa-microchip"></i> CPU: <span id="sys-cpu">0</span>%</p>
+                <p><i class="fa-solid fa-memory"></i> RAM Free: <span id="sys-ram">0</span> MB</p>
+                <p><i class="fa-solid fa-clock"></i> Up: <span id="sys-uptime">00:00</span></p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <div>
+                    <h1 id="page-title">System Overview</h1>
+                    <p class="subtitle" id="router-identity">Device: Unknown</p>
+                </div>
+                <div class="user-profile">
+                    <button class="btn btn-export" onclick="downloadBackup()"
+                        style="margin-right: 10px; background:rgba(59, 130, 246, 0.2);"><i
+                            class="fa-solid fa-download"></i> Backup Config</button>
+                    <button class="btn btn-export" onclick="rebootRouter()"
+                        style="margin-right: 10px; background:rgba(239, 68, 68, 0.2); color:var(--warning);"><i
+                            class="fa-solid fa-power-off"></i> Reboot</button>
+                    <button class="btn btn-export" onclick="logout()" style="margin-right: 10px;"><i
+                            class="fa-solid fa-sign-out-alt"></i> Logout</button>
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff" alt="Admin"
+                        style="vertical-align: middle;">
+                </div>
+            </header>
+
+            <!-- Network Map Tab -->
+            <div id="netmap-tab" class="tab-content hidden">
+                <section class="panel glass" style="margin-bottom:1.5rem">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-diagram-project"></i> Network Device Map</h2>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                            <span id="netmap-count" class="text-muted" style="font-size:.9rem"></span>
+                            <button class="btn btn-export" onclick="loadNetworkMap()"><i class="fa-solid fa-rotate"></i> Refresh Map</button>
+                            <button class="btn btn-export" onclick="exportTableToCSV('netmap-table','devices.csv')"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="scan-progress" id="netmap-progress"><div class="scan-progress-bar" id="netmap-bar"></div></div>
+                    <div id="netmap-device-grid" class="device-grid">
+                        <div class="empty-state" style="grid-column:1/-1">Click <strong>Refresh Map</strong> to load all network devices.</div>
+                    </div>
+                    <!-- Hidden table for CSV export -->
+                    <table id="netmap-table" style="display:none">
+                        <thead><tr><th>IP</th><th>Hostname</th><th>MAC</th><th>Vendor</th><th>Interface</th><th>Status</th><th>DHCP Status</th></tr></thead>
+                        <tbody id="netmap-table-body"></tbody>
+                    </table>
+                </section>
+
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-radar"></i> Active Ping Sweep (Subnet Scanner)</h2>
+                        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                            <input type="text" id="sweep-subnet" value="10.21.10.0/24" placeholder="e.g. 192.168.88.0/24"
+                                style="padding:.4rem .8rem;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:white;font-family:monospace;width:200px">
+                            <button class="btn btn-export" onclick="runPingSweep()"><i class="fa-solid fa-play"></i> Start Sweep</button>
+                        </div>
+                    </div>
+                    <p style="font-size:.82rem;color:#94a3b8;margin-bottom:1rem"><i class="fa-solid fa-circle-info"></i> TCP-probe scan — checks common ports (80, 443, 22, 8080, 8291, 53) per host. Max /24 subnet.</p>
+                    <div class="scan-progress" id="sweep-progress"><div class="scan-progress-bar" id="sweep-bar"></div></div>
+                    <div id="sweep-device-grid" class="device-grid">
+                        <div class="empty-state" style="grid-column:1/-1">Enter a subnet and click Start Sweep.</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard-tab" class="tab-content active">
+                <section class="kpi-grid">
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon"><i class="fa-solid fa-server"></i></div>
+                        <div class="kpi-info">
+                            <h3>Interfaces</h3>
+                            <p class="kpi-value" id="kpi-interfaces">0</p>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass warning-glow">
+                        <div class="kpi-icon"><i class="fa-solid fa-shield-virus"></i></div>
+                        <div class="kpi-info">
+                            <h3>Active Alerts</h3>
+                            <p class="kpi-value text-warning" id="kpi-alerts">0</p>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon"><i class="fa-solid fa-download"></i></div>
+                        <div class="kpi-info">
+                            <h3>Total RX</h3>
+                            <p class="kpi-value" id="kpi-rx">0 B</p>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon"><i class="fa-solid fa-upload"></i></div>
+                        <div class="kpi-info">
+                            <h3>Total TX</h3>
+                            <p class="kpi-value" id="kpi-tx">0 B</p>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dashboard-grid-3">
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-chart-area"></i> Top Interface Traffic</h2>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="trafficChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-microchip"></i> CPU Usage</h2>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cpuChart"></canvas>
+                        </div>
+                    </section>
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-globe"></i> Latency (8.8.8.8)</h2>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="latencyChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <section class="panel glass mt-4">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-network-wired"></i> Live Interfaces</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>RX Bytes</th>
+                                    <th>TX Bytes</th>
+                                    <th>Rx Err</th>
+                                    <th>Tx Err</th>
+                                </tr>
+                            </thead>
+                            <tbody id="interfaces-body">
+                                <tr>
+                                    <td colspan="7" class="text-center">Loading data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- DHCP Tab -->
+            <div id="dhcp-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-laptop-network"></i> Active DHCP Leases</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('dhcpTable', 'dhcp_leases.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="dhcpTable">
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Server</th>
+                                    <th>Status</th>
+                                    <th>Hostname</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dhcp-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ARP Tab -->
+            <div id="arp-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-address-book"></i> ARP Table</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('arpTable', 'arp_table.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="arpTable">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Interface</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="arp-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Connections Tab -->
+            <div id="connections-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-right-left"></i> Top 50 Active Connections</h2>
+                        <button class="btn btn-export"
+                            onclick="exportTableToCSV('connectionsTable', 'connections.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="connectionsTable">
+                            <thead>
+                                <tr>
+                                    <th>Protocol</th>
+                                    <th>Src Address</th>
+                                    <th>Dst Address</th>
+                                    <th>Reply Src</th>
+                                    <th>Timeout</th>
+                                </tr>
+                            </thead>
+                            <tbody id="connections-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- NAT Tab -->
+            <div id="nat-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-door-open"></i> NAT & Port Forwarding Rules</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('natTable', 'nat_rules.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="natTable">
+                            <thead>
+                                <tr>
+                                    <th>Chain</th>
+                                    <th>Action</th>
+                                    <th>Protocol</th>
+                                    <th>Dst Port</th>
+                                    <th>To Addresses</th>
+                                    <th>To Ports</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nat-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Routes Tab -->
+            <div id="routes-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-route"></i> IP Routes</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('routesTable', 'routes.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="routesTable">
+                            <thead>
+                                <tr>
+                                    <th>Dst Address</th>
+                                    <th>Gateway</th>
+                                    <th>Distance</th>
+                                    <th>Active</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routes-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Neighbors Tab -->
+            <div id="neighbors-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-tower-broadcast"></i> Network Neighbors</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('neighborsTable', 'neighbors.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="neighborsTable">
+                            <thead>
+                                <tr>
+                                    <th>Interface</th>
+                                    <th>IP Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Identity</th>
+                                    <th>Platform</th>
+                                </tr>
+                            </thead>
+                            <tbody id="neighbors-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Alerts Tab -->
+            <div id="alerts-tab" class="tab-content hidden">
+                <div class="threat-stat-grid" id="threat-stats-bar" style="margin-bottom:1.5rem"></div>
+                <div class="dashboard-grid">
+                    <section class="panel glass col-span-2">
+                        <div class="panel-header alert-header">
+                            <h2><i class="fa-solid fa-shield-virus"></i> Security Alerts & Anomalies</h2>
+                        </div>
+                        <div class="alerts-container" id="alerts-container">
+                            <div class="empty-state">No active threats detected.</div>
+                        </div>
+                    </section>
+                </div>
+                <section class="panel glass mt-4">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-terminal"></i> System Logs</h2>
+                    </div>
+                    <div class="logs-container" id="logs-container">
+                        <div class="empty-state">Loading logs...</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Scanner Tab -->
+            <div id="scanner-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-radar"></i> TCP Port Scanner</h2>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="scan-target" placeholder="Enter IP (e.g. 192.168.88.1)"
+                                style="padding:0.4rem; border-radius:4px; border:none; background:rgba(255,255,255,0.1); color:white;">
+                            <button class="btn btn-export" onclick="startScan()"><i class="fa-solid fa-play"></i> Start
+                                Scan</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="scannerTable">
+                            <thead>
+                                <tr>
+                                    <th>Port</th>
+                                    <th>Service</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanner-body">
+                                <tr>
+                                    <td colspan="3" class="text-center empty-state">Enter an IP address and click Start
+                                        Scan</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Sniffer Tab (Now powered by Connections to save CPU) -->
+            <div id="sniffer-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-satellite-dish"></i> Live Traffic Flow (Top Connections)</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('snifferTable', 'sniffer.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="snifferTable">
+                            <thead>
+                                <tr>
+                                    <th>Protocol</th>
+                                    <th>Src Address</th>
+                                    <th>Dst Address</th>
+                                    <th>Reply Src</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sniffer-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Waiting for traffic data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div id="users-tab" class="tab-content hidden">
+                <section class="panel glass" style="margin-bottom:1.5rem">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-users"></i> System Administrators</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Group</th>
+                                    <th>Last Login</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-body">
+                                <tr>
+                                    <td colspan="3" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-user-clock"></i> Active Sessions</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Via</th>
+                                    <th>From IP</th>
+                                    <th>When</th>
+                                </tr>
+                            </thead>
+                            <tbody id="active-users-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- DNS Tab -->
+            <div id="dns-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-globe"></i> DNS Web Tracker (Cache)</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('dnsTable', 'dns.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="dnsTable">
+                            <thead>
+                                <tr>
+                                    <th>Domain Name</th>
+                                    <th>Resolved Type</th>
+                                    <th>Data / IP</th>
+                                    <th>TTL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dns-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading DNS Cache...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- VPN Tab -->
+            <div id="vpn-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-user-shield"></i> Active VPN / PPP Clients</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Service</th>
+                                    <th>Caller ID</th>
+                                    <th>IP Address</th>
+                                    <th>Uptime</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vpn-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading VPN Data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Firewall Tab -->
+            <div id="firewall-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-shield-cat"></i> Firewall Filter Rules</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Action</th>
+                                    <th>Chain</th>
+                                    <th>Protocol</th>
+                                    <th>Bytes</th>
+                                    <th>Packets</th>
+                                </tr>
+                            </thead>
+                            <tbody id="firewall-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading Firewall Data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Packages Tab -->
+            <div id="packages-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-box-open"></i> Installed Packages</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Version</th>
+                                    <th>Build Time</th>
+                                    <th>Disabled</th>
+                                </tr>
+                            </thead>
+                            <tbody id="packages-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading Packages...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Hotspot Tab -->
+            <div id="hotspot-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-wifi"></i> Active Hotspot Users</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>IP Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Uptime</th>
+                                    <th>Bytes In/Out</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hotspot-body">
+                                <tr>
+                                    <td colspan="5" class="text-center">Loading Hotspot Data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- IP Services Tab -->
+            <div id="services-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-server"></i> IP Services (Security Audit)</h2>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Service Name</th>
+                                    <th>Port</th>
+                                    <th>Available From</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="services-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading IP Services...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- IP Addresses Tab -->
+            <div id="ip-addresses-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-network-wired"></i> IP Addresses</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('ipAddrTable', 'ip_addresses.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="ipAddrTable">
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>Interface</th>
+                                    <th>Network</th>
+                                    <th>Disabled</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ip-addresses-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Mangle Tab -->
+            <div id="mangle-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-code-branch"></i> Firewall Mangle Rules</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('mangleTable', 'mangle.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="mangleTable">
+                            <thead>
+                                <tr>
+                                    <th>Action</th>
+                                    <th>Chain</th>
+                                    <th>Protocol</th>
+                                    <th>Src Address</th>
+                                    <th>Dst Address</th>
+                                    <th>Bytes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mangle-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Address Lists Tab -->
+            <div id="address-lists-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-list"></i> Firewall Address Lists</h2>
+                        <button class="btn btn-export"
+                            onclick="exportTableToCSV('addrListTable', 'address_lists.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="addrListTable">
+                            <thead>
+                                <tr>
+                                    <th>List Name</th>
+                                    <th>Address</th>
+                                    <th>Timeout</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="address-lists-body">
+                                <tr>
+                                    <td colspan="4" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Queues Tab -->
+            <div id="queues-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-gauge-high"></i> Bandwidth Shaping (Simple Queues)</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('queuesTable', 'queues.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="queuesTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Target</th>
+                                    <th>Max Upload</th>
+                                    <th>Max Download</th>
+                                    <th>TX Rate</th>
+                                    <th>RX Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="queues-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Wireless Clients Tab -->
+            <div id="wireless-tab" class="tab-content hidden">
+                <section class="panel glass">
+                    <div class="panel-header alert-header-flex">
+                        <h2><i class="fa-solid fa-wifi"></i> Wireless Clients (Registration Table)</h2>
+                        <button class="btn btn-export" onclick="exportTableToCSV('wirelessTable', 'wireless.csv')"><i
+                                class="fa-solid fa-file-csv"></i> Export CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table id="wirelessTable">
+                            <thead>
+                                <tr>
+                                    <th>Interface</th>
+                                    <th>MAC Address</th>
+                                    <th>Signal</th>
+                                    <th>TX Rate</th>
+                                    <th>RX Rate</th>
+                                    <th>Uptime</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wireless-body">
+                                <tr>
+                                    <td colspan="6" class="text-center">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Scripts & Scheduler Tab -->
+            <div id="scripts-tab" class="tab-content hidden">
+                <div class="dashboard-grid-3">
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-scroll"></i> System Scripts (Security Audit)</h2>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Policy</th>
+                                        <th>Last Run</th>
+                                        <th>Comment</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scripts-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-calendar-check"></i> Scheduler (Cron Jobs)</h2>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Interval</th>
+                                        <th>Policy</th>
+                                        <th>On Event</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="schedulers-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Loading...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Diagnostics / Tools Tab -->
+            <div id="tools-tab" class="tab-content hidden">
+                <div class="dashboard-grid">
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-terminal"></i> Router Ping Test</h2>
+                        </div>
+                        <div style="display:flex;gap:10px;margin-bottom:1rem;">
+                            <input type="text" id="ping-tool-address" placeholder="e.g. google.com or 8.8.8.8" class="search-input" style="flex:1">
+                            <input type="number" id="ping-tool-count" value="4" min="1" max="10" class="search-input" style="width:70px">
+                            <button class="btn btn-export" onclick="runPingTool()"><i class="fa-solid fa-play"></i> Ping</button>
+                        </div>
+                        <div class="logs-container" id="ping-tool-output" style="height:250px;font-family:monospace;white-space:pre-wrap;">
+                            <div class="empty-state">Enter address and click Ping.</div>
+                        </div>
+                    </section>
+
+                    <section class="panel glass">
+                        <div class="panel-header">
+                            <h2><i class="fa-solid fa-globe"></i> DNS Lookup Resolver</h2>
+                        </div>
+                        <div style="display:flex;gap:10px;margin-bottom:1rem;">
+                            <input type="text" id="dns-tool-domain" placeholder="e.g. google.com" class="search-input" style="flex:1">
+                            <button class="btn btn-export" onclick="runDnsLookupTool()"><i class="fa-solid fa-play"></i> Resolve</button>
+                        </div>
+                        <div class="logs-container" id="dns-tool-output" style="height:250px;font-family:monospace;white-space:pre-wrap;">
+                            <div class="empty-state">Enter domain and click Resolve.</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

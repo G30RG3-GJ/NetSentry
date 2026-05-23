@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+routeros_api
+python-dotenv
+PyJWT
+passlib
+bcrypt
+websockets
+python-multipart

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetSentry | Login</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .login-box {
+            background: var(--bg-panel);
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: 400px;
+            text-align: center;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(var(--glass-blur));
+        }
+        .login-box h2 {
+            margin-bottom: 2rem;
+            color: var(--primary);
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.8rem;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .login-btn {
+            width: 100%;
+            padding: 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .login-btn:hover {
+            background: #2563eb;
+        }
+        #error-msg {
+            color: var(--warning);
+            margin-top: 1rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box glass">
+            <h2><i class="fa-solid fa-shield-halved"></i> NetSentry</h2>
+            <form id="login-form">
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="login-btn">Secure Login</button>
+                <p id="error-msg">Invalid credentials</p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            
+            const formData = new URLSearchParams();
+            formData.append('username', u);
+            formData.append('password', p);
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('netsentry_token', data.access_token);
+                    window.location.href = '/dashboard';
+                } else {
+                    document.getElementById('error-msg').style.display = 'block';
+                }
+            } catch (err) {
+                document.getElementById('error-msg').style.display = 'block';
+                document.getElementById('error-msg').innerText = 'Connection error';
+            }
+        });
+    </script>
+</body>
+</html>
