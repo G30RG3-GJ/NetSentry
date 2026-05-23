@@ -19,13 +19,23 @@ from core.network_scanner import build_device_map, ping_sweep, full_device_scan
 
 load_dotenv()
 
+import sys
+
+# Resolve static directory path dynamically for PyInstaller support
+if getattr(sys, 'frozen', False):
+    base_dir = sys._MEIPASS
+else:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+static_dir = os.path.join(base_dir, "static")
+
 app = FastAPI(title="NetSentry SOC Dashboard")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 mikrotik = MikroTikClient()
 analyzer = LogAnalyzer()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -65,11 +75,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @app.get("/")
 async def root():
-    return FileResponse("static/login.html")
+    return FileResponse(os.path.join(static_dir, "login.html"))
 
 @app.get("/dashboard")
 async def dashboard():
-    return FileResponse("static/index.html")
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 @app.get("/api/status")
 async def get_status(current_user: str = Depends(get_current_user)):

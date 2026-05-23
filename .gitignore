@@ -6,3 +6,6 @@ __pycache__/
 .vscode/
 .system_generated/
 scratch/
+build/
+dist/
+*.spec
