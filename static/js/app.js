@@ -168,9 +168,12 @@ function updateDashboard(data) {
             }
             lastRx[ifc.name] = rx; lastTx[ifc.name] = tx;
             const up = ifc.running === 'true';
+            const disabled = ifc.disabled === 'true';
+            const ifcId = ifc['.id'] || ifc.name;
+            const toggleBtn = `<button class="btn btn-export" style="padding:2px 6px;font-size:0.72rem;margin-left:6px;${disabled ? 'background:rgba(16,185,129,0.2);color:#10b981;' : 'background:rgba(239,68,68,0.2);color:var(--warning);'}" onclick="toggleInterface('${ifcId}', ${disabled})"><i class="fa-solid ${disabled ? 'fa-play' : 'fa-pause'}"></i> ${disabled ? 'Enable' : 'Disable'}</button>`;
             html += `<tr>
                 <td><span class="status-badge ${up ? 'status-up' : 'status-down'}">${up ? 'UP' : 'DOWN'}</span></td>
-                <td><strong>${ifc.name}</strong></td>
+                <td><strong>${ifc.name}</strong> ${toggleBtn}</td>
                 <td><span class="text-muted">${ifc.type || '-'}</span></td>
                 <td>${fmtB(rx)}</td><td>${fmtB(tx)}</td>
                 <td class="${(ifc['rx-error'] || 0) > 0 ? 'text-warning' : ''}">${ifc['rx-error'] || 0}</td>
@@ -359,9 +362,10 @@ function renderFirewall(d) {
 function renderAddressLists(d) {
     return d.map(a => {
         const warn = (a.list || '').toLowerCase().includes('block') || (a.list || '').toLowerCase().includes('ban');
+        const unblockBtn = a.address ? `<button class="btn btn-export" style="padding:2px 8px;font-size:0.75rem;background:rgba(16,185,129,0.2);color:#10b981;" onclick="unblockIp('${a.address}')"><i class="fa-solid fa-lock-open"></i> Unblock</button>` : '';
         return `<tr>
             <td><strong class="${warn ? 'text-warning' : ''}">${a.list || '-'}</strong></td>
-            <td>${a.address || '-'}</td>
+            <td>${a.address || '-'} ${unblockBtn}</td>
             <td><span class="text-muted">${a.timeout || 'Permanent'}</span></td>
             <td><span class="text-muted">${a.comment || '-'}</span></td></tr>`;
     }).join('');
@@ -687,14 +691,84 @@ function guessDeviceIcon(vendor, hostname) {
     return '🖥️';
 }
 
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    const bg = type === 'success' ? 'rgba(16, 185, 129, 0.9)' : type === 'error' ? 'rgba(239, 68, 68, 0.9)' : 'rgba(59, 130, 246, 0.9)';
+    toast.style.cssText = `background:${bg};color:white;padding:12px 18px;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.4);font-size:0.9rem;font-weight:500;pointer-events:auto;transition:all 0.3s ease;transform:translateY(10px);opacity:0;display:flex;align-items:center;gap:10px;backdrop-filter:blur(10px);`;
+    const icon = type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info';
+    toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.transform = 'translateY(0)'; toast.style.opacity = '1'; }, 10);
+    setTimeout(() => {
+        toast.style.transform = 'translateY(10px)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
 async function blockIp(ip) {
     if (!confirm(`Block IP: ${ip}?\nAdded to NetSentry_Blocklist.`)) return;
     try {
         const r = await fetch('/api/block_ip', { method: 'POST', headers: authHeaders, body: JSON.stringify({ ip_address: ip }) });
         if (r.status === 401) return logout();
         const d = await r.json();
-        alert(d.status === 'success' ? `✅ ${d.message}` : `❌ ${d.message}`);
-    } catch { alert('Failed to block IP.'); }
+        if (d.status === 'success') showToast(`✅ ${d.message}`, 'success');
+        else showToast(`❌ ${d.message}`, 'error');
+    } catch { showToast('Failed to block IP.', 'error'); }
+}
+
+async function unblockIp(ip) {
+    if (!confirm(`Unblock IP: ${ip}?\nRemove from NetSentry_Blocklist.`)) return;
+    try {
+        const r = await fetch('/api/unblock_ip', { method: 'POST', headers: authHeaders, body: JSON.stringify({ ip_address: ip }) });
+        if (r.status === 401) return logout();
+        const d = await r.json();
+        if (d.status === 'success') showToast(`✅ ${d.message}`, 'success');
+        else showToast(`❌ ${d.message}`, 'error');
+    } catch { showToast('Failed to unblock IP.', 'error'); }
+}
+
+async function flushDNS() {
+    try {
+        const r = await fetch('/api/tools/flush_dns', { method: 'POST', headers: authHeaders });
+        if (r.status === 401) return logout();
+        const d = await r.json();
+        if (d.status === 'success') showToast(`🧹 ${d.message}`, 'success');
+        else showToast(`❌ ${d.message}`, 'error');
+    } catch { showToast('Failed to flush DNS cache.', 'error'); }
+}
+
+async function toggleInterface(interfaceId, currentlyDisabled) {
+    const actionName = currentlyDisabled ? 'enable' : 'disable';
+    if (!confirm(`Are you sure you want to ${actionName} interface ${interfaceId}?`)) return;
+    try {
+        const r = await fetch('/api/interface/toggle', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ interface_id: interfaceId, disabled: !currentlyDisabled })
+        });
+        if (r.status === 401) return logout();
+        const d = await r.json();
+        if (d.status === 'success') showToast(`⚡ Interface ${actionName}d.`, 'success');
+        else showToast(`❌ ${d.message}`, 'error');
+    } catch { showToast('Failed to toggle interface.', 'error'); }
+}
+
+async function removeDHCPLease(leaseId) {
+    if (!confirm(`Remove DHCP lease ${leaseId}?`)) return;
+    try {
+        const r = await fetch('/api/dhcp/remove', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ lease_id: leaseId })
+        });
+        if (r.status === 401) return logout();
+        const d = await r.json();
+        if (d.status === 'success') showToast(`🗑️ ${d.message}`, 'success');
+        else showToast(`❌ ${d.message}`, 'error');
+    } catch { showToast('Failed to remove lease.', 'error'); }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

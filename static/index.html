@@ -67,6 +67,9 @@
                     <p class="subtitle" id="router-identity">Device: Unknown</p>
                 </div>
                 <div class="user-profile">
+                    <button class="btn btn-export" onclick="flushDNS()"
+                        style="margin-right: 10px; background:rgba(16, 185, 129, 0.2); color:#10b981;"><i
+                            class="fa-solid fa-broom"></i> Flush DNS</button>
                     <button class="btn btn-export" onclick="downloadBackup()"
                         style="margin-right: 10px; background:rgba(59, 130, 246, 0.2);"><i
                             class="fa-solid fa-download"></i> Backup Config</button>
@@ -901,6 +904,9 @@
 
         </main>
     </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
     <script src="/static/js/app.js"></script>
 </body>

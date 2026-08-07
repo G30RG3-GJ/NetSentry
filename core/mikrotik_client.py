@@ -233,6 +233,74 @@ class MikroTikClient:
             logger.error(f"Error blocking IP {ip_address}: {e}")
             return False
 
+    def unblock_ip(self, ip_address: str) -> bool:
+        if not self.api:
+            if not self.connect():
+                return False
+        try:
+            address_list = self.api.get_resource('/ip/firewall/address-list')
+            items = address_list.get(address=ip_address)
+            if not items:
+                # Try finding by list and matching address
+                all_items = address_list.get(list="NetSentry_Blocklist")
+                items = [item for item in all_items if item.get('address') == ip_address]
+            for item in items:
+                address_list.remove(id=item['id'])
+            logger.info(f"Unblocked IP: {ip_address}")
+            return True
+        except Exception as e:
+            if self._is_dead_socket(e):
+                self.disconnect()
+            logger.error(f"Error unblocking IP {ip_address}: {e}")
+            return False
+
+    def flush_dns_cache(self) -> bool:
+        if not self.api:
+            if not self.connect():
+                return False
+        try:
+            self.api.get_resource('/ip/dns/cache').call('flush')
+            logger.info("Flushed DNS cache")
+            return True
+        except Exception as e:
+            if self._is_dead_socket(e):
+                self.disconnect()
+            logger.error(f"Error flushing DNS cache: {e}")
+            return False
+
+    def toggle_interface(self, interface_id: str, disabled: bool) -> bool:
+        if not self.api:
+            if not self.connect():
+                return False
+        try:
+            res = self.api.get_resource('/interface')
+            if disabled:
+                res.call('disable', {'.id': interface_id})
+            else:
+                res.call('enable', {'.id': interface_id})
+            logger.info(f"Toggled interface {interface_id} disabled={disabled}")
+            return True
+        except Exception as e:
+            if self._is_dead_socket(e):
+                self.disconnect()
+            logger.error(f"Error toggling interface {interface_id}: {e}")
+            return False
+
+    def remove_dhcp_lease(self, lease_id: str) -> bool:
+        if not self.api:
+            if not self.connect():
+                return False
+        try:
+            res = self.api.get_resource('/ip/dhcp-server/lease')
+            res.remove(id=lease_id)
+            logger.info(f"Removed DHCP lease {lease_id}")
+            return True
+        except Exception as e:
+            if self._is_dead_socket(e):
+                self.disconnect()
+            logger.error(f"Error removing DHCP lease {lease_id}: {e}")
+            return False
+
     # ── VPN / PPP ─────────────────────────────────────────────────────────────
 
     def get_active_vpns(self) -> List[Dict[str, Any]]:

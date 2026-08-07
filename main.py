@@ -73,6 +73,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         return {"access_token": token, "token_type": "bearer"}
     raise HTTPException(status_code=400, detail="Incorrect username or password")
 
+from fastapi.responses import FileResponse, PlainTextResponse, Response
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    svg_favicon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🛡️</text></svg>'
+    return Response(content=svg_favicon, media_type="image/svg+xml")
+
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(static_dir, "login.html"))
@@ -91,6 +98,13 @@ async def get_status(current_user: str = Depends(get_current_user)):
 class BlockRequest(BaseModel):
     ip_address: str
 
+class ToggleInterfaceRequest(BaseModel):
+    interface_id: str
+    disabled: bool
+
+class RemoveLeaseRequest(BaseModel):
+    lease_id: str
+
 class ScanRequest(BaseModel):
     ip_address: str
 
@@ -100,6 +114,35 @@ async def block_ip(req: BlockRequest, current_user: str = Depends(get_current_us
     if success:
         return {"status": "success", "message": f"IP {req.ip_address} blocked."}
     return {"status": "error", "message": "Failed to block IP."}
+
+@app.post("/api/unblock_ip")
+async def unblock_ip(req: BlockRequest, current_user: str = Depends(get_current_user)):
+    success = mikrotik.unblock_ip(req.ip_address)
+    if success:
+        return {"status": "success", "message": f"IP {req.ip_address} unblocked."}
+    return {"status": "error", "message": "Failed to unblock IP."}
+
+@app.post("/api/tools/flush_dns")
+async def flush_dns(current_user: str = Depends(get_current_user)):
+    success = mikrotik.flush_dns_cache()
+    if success:
+        return {"status": "success", "message": "DNS cache flushed successfully."}
+    return {"status": "error", "message": "Failed to flush DNS cache."}
+
+@app.post("/api/interface/toggle")
+async def toggle_interface(req: ToggleInterfaceRequest, current_user: str = Depends(get_current_user)):
+    success = mikrotik.toggle_interface(req.interface_id, req.disabled)
+    status_str = "disabled" if req.disabled else "enabled"
+    if success:
+        return {"status": "success", "message": f"Interface {status_str}."}
+    return {"status": "error", "message": f"Failed to toggle interface state."}
+
+@app.post("/api/dhcp/remove")
+async def remove_dhcp_lease(req: RemoveLeaseRequest, current_user: str = Depends(get_current_user)):
+    success = mikrotik.remove_dhcp_lease(req.lease_id)
+    if success:
+        return {"status": "success", "message": "DHCP lease removed."}
+    return {"status": "error", "message": "Failed to remove DHCP lease."}
 
 @app.post("/api/scan_ports")
 async def run_scan(req: ScanRequest, current_user: str = Depends(get_current_user)):
